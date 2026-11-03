@@ -1,0 +1,6 @@
+node_modules/
+.runtime/
+.secretary/
+.omp/
+.DS_Store
+coverage/
