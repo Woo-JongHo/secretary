@@ -1,56 +1,88 @@
-# Secretary
+# Assistant
 
-프로젝트를 대화로 풀면서 결정 이유와 진행 상황을 같은 보고서로 남기는 얇은 하네스입니다.
-실행 기반은 **[Oh My Pi](https://github.com/can1357/oh-my-pi)**입니다. 모델 인증·대화·세션·도구는 OMP를 사용하고,
-Secretary는 공통 질문 흐름·PM 보고서·사용자 결정 기록·View 연결을 추가합니다.
+시험·개발 환경에 준비된 **Codex**에 과제 진행 규칙, 보고서, 사용자 결정 기록, 계획, 아키텍처 View를 더하는 harness입니다.
 
-공통 흐름: **문제·목표 → 대안·추천 → 사용자 결정 → 설계·View → 확인 결과·다음 쟁점**.
+Oh My Pi v18.16.0에서 계획 파일 읽기·재개 코드와 계획 작성 지침을 선별 이식했습니다. 이 소스는 이 저장소가 직접 소유·수정하며 출처·해시·MIT 고지는 `third_party/oh-my-pi/`에 보존합니다. OMP CLI·확장·에이전트 루프는 설치하지 않습니다.
 
-## 시작
+Gajae-Code v0.15.3의 질문·진행 보고·단계·근거 계약은 Assistant의 단계 기록과 요약으로 선별 이식했습니다. 출처·원본 commit·파일 해시·MIT 고지는 `third_party/gajae-code/`에 있습니다. [아이디어와 구현 위치](docs/source-map.md)에서 실제 이식과 설계 참고를 구분합니다.
 
-Bun 1.4.4 이상, Node.js 22.22.3 이상이 필요합니다.
+## 시험 환경에서 시작
 
-```sh
-bun install
-./secretary /path/to/project
-```
-
-OMP에서 사용할 모델을 `/model`로 선택합니다. 인증이 필요하면 OMP의 `/login`을 사용합니다.
-Secretary는 자격 증명을 저장하거나 다른 도구에서 복사하지 않습니다.
-
-```text
-/secretary 임직원 1500명의 통근버스 위치와 탑승 노선을 확인하는 서비스를 기획한다
-```
-
-선택이 필요할 때 대안과 추천 이유가 표시됩니다. 실제 사용자 선택만 확정으로 기록합니다.
-보고서는 `.secretary/report.md`, 아키텍처 모델은 `.secretary/architecture/model.c4`에 남습니다.
-
-```text
-/secretary-view
-```
-
-`.secretary/view/index.html`을 열면 보고서와 아키텍처 노드 링크를 볼 수 있습니다.
-구조 변경 후 생성하지 않았거나 빌드가 실패하면 View를 오래됨으로 표시합니다.
-초기 모델에는 프로젝트 노드만 있으며, 앱·서버·DB 등은 대화에서 정한 뒤 추가합니다.
-화면 미리보기는 과제에서 만들어진 실제 링크를 보고서 설계 절에 연결합니다.
-
-OMP가 이미 설치되어 있다면 확장 패키지로 직접 사용할 수도 있습니다.
+준비물: 실행·인증이 준비된 `codex`, Bun 1.4.4 이상. View 생성에는 Node.js 22.22.3 이상도 필요합니다.
 
 ```sh
-omp --extension /path/to/secretary
+git clone https://github.com/Woo-JongHo/secretary.git assistant
+cd assistant
+bun install --frozen-lockfile
+./assistant start /path/to/exam-project
 ```
 
-확장은 OMP의 [공식 확장 계약](https://omp.sh/docs/extension-authoring)을 사용합니다.
+현재 원격 저장소는 `secretary`라는 이름의 비공개 저장소이므로 다운로드할 계정에 접근 권한이 필요합니다. 과제 폴더는 이미 존재하는 디렉터리를 지정합니다.
 
-## 경계
+`start`는 과제 폴더에 스킬과 보고서를 준비한 뒤 기존 Codex를 열어 `$assistant`로 시작합니다. 시험문제를 붙여넣거나 파일을 지정합니다.
 
-- 모델과 실행 엔진: Oh My Pi
-- 질문·보고서·선택 기록: Secretary
-- 아키텍처 모델 → 노드 View: LikeC4
-- 공통 사고 방식: BMAD의 질문 방식, OpenSpec의 문서 역할, WES의 결정·근거 연결을 참고
+```sh
+./assistant start /path/to/exam-project --task-file /path/to/problem.md
+```
 
-OpenSpec·BMAD·별도 DB를 설치하지 않습니다. 생성된 `.secretary/` 자료는 대상 프로젝트가
-소유합니다. Git에 기록할 범위는 해당 프로젝트에서 정합니다.
+모델·인증·권한은 기존 Codex 설정을 사용합니다. Codex 옵션은 `--` 뒤로 전달합니다.
+
+```sh
+./assistant start /path/to/exam-project -- --model configured-model
+```
+
+Codex를 이미 열었다면 터미널에서 아래 준비 명령을 실행하고 대화에 `$assistant`를 입력합니다. 새 스킬이 보이지 않으면 Codex를 다시 시작합니다.
+
+```sh
+/path/to/assistant/assistant init /path/to/exam-project
+```
+
+## 실행과 산출물
+
+문제·성공 기준 → 대안·추천 → 필요한 사용자 결정 → 설계·구현 → 검증·다음 쟁점 흐름으로 진행합니다. 이미 허가된 작업은 새 선택 없이 계속 수행합니다.
+
+[이 프로젝트의 구조 완성 과제로 본 예상 대화](docs/structure-scenario.md)에는 첫 질문·단계 요약·실패·재개 예시가 있습니다. 예시 선택은 실제 사용자 결정이 아닙니다.
+
+| 담당 | 범위 |
+| --- | --- |
+| Codex | 모델·인증·대화·세션·기본 실행 도구 |
+| Assistant | 시작 명령·스킬 설치·진행 규칙·보고서·결정·계획·View 연결 |
+| LikeC4 | 아키텍처 모델 검증·노드 View 생성 |
+
+```text
+assistant/                       # 다운로드한 harness, 설치 후에도 보존
+exam-project/
+├── .agents/skills/assistant      # harness의 스킬 폴더를 가리키는 링크
+└── .assistant/
+    ├── report.md
+    ├── summary.md               # 현재 단계 요약, 원문에서 복구 가능
+    ├── steps/1.json             # 단계별 근거·질문·응답·파일 해시 원문
+    ├── plan.md                  # 여러 단계 작업에서 필요할 때 생성
+    ├── architecture/model.c4
+    └── view/index.html
+```
+
+기존 `.secretary/` 자료가 있으면 그 경로를 이어 씁니다. 기존 보고서·사용자 코드·`AGENTS.md`를 초기화하거나 덮어쓰지 않습니다. 같은 이름의 다른 스킬과 충돌하면 오류를 반환합니다. 스킬 링크가 원본을 가리키므로 다운로드한 harness 폴더를 이동·삭제하지 마세요.
+
+실제 산출물 경로는 `status`로 확인합니다. Codex 안에서는 설치된 스킬 옆의 `scripts/run`으로 같은 명령을 사용할 수 있습니다.
+
+```sh
+./assistant status /path/to/exam-project
+./assistant step /path/to/exam-project --file step-result.json
+./assistant summary /path/to/exam-project
+./assistant report design /path/to/exam-project --file design-summary.md
+./assistant plan /path/to/exam-project --file execution-plan.md
+./assistant decision /path/to/exam-project --file user-decision.json
+./assistant view /path/to/exam-project
+```
+
+`--file -`는 표준 입력을 읽습니다. `decision` JSON에는 `topic`, 서로 다른 `options` 2~3개, `selected`, `rationale`, 실제 사용자 응답 근거인 `evidence`가 필요합니다. 코드가 검증하는 것은 형식과 선택지 일치입니다. 실제 응답인지 확인하고 취소·무응답을 기록하지 않는 책임은 스킬 수행 에이전트에 있습니다. 계획 파일의 존재는 승인을 뜻하지 않습니다.
+
+주 진행 경로는 `step`입니다. 문제 정리 → 설계 → 구현 → 검증 → 마무리를 기록하고, 확인된 것·가정·미확인·검증·산출물·다음 행동을 같은 형식으로 반환합니다. 질문 대기에는 실제 응답이 필요합니다. 검증 실패·미실행이나 검증 후 산출물 변경이 있으면 완료할 수 없습니다. 범위 변경은 이유와 함께 이전 단계를 다시 열며 이력은 보존합니다. [단계 JSON 계약과 예시](skills/assistant/references/conversation.md)를 참고하세요.
+
+단계 기록 이후 문제·검증·다음 쟁점 절은 원문에서 생성하며 `report`로 덮어쓰지 않습니다. 기존 `decision`은 별도 결정 기록용이고 대기 질문은 `step.answer`로 해제합니다. 원문 저장 후 보고서 갱신이 실패하면 같은 ID·입력으로 재시도하거나 `summary`로 복구합니다. 이 명령은 제출된 검사 근거의 형식·단계·파일 변경을 확인합니다. 실제 응답과 검사의 진위는 수행 에이전트와 독립 리뷰가 확인해야 합니다. Codex의 모든 자유 발화를 가로채는 훅은 아닙니다.
+
+View는 모델 변경이나 기존 View의 재생성 실패 시 오래됨으로 표시하며, 첫 생성 실패는 생성 실패로 표시합니다. 자체 구조 예제는 `examples/assistant/model.c4`입니다.
 
 ## 검증
 
@@ -60,9 +92,6 @@ bun test
 bun run smoke
 ```
 
-`smoke`는 실제 OMP 세션에 확장을 로드해 명령·도구 등록과 `/secretary` 수용을 확인하고,
-LikeC4 모델 검증·정적 View 생성을 확인합니다. 모델 인증을 요구하는 실제 대화와
-TUI 선택창의 종단 검증은 별도입니다.
+`smoke`는 실제 CLI로 준비·보고서·계획·결정·단계·요약·재시작을 검사하고, 실제 LikeC4 validate/build와 실패·삭제 복구를 확인합니다. 설치된 Codex app-server의 `skills/list`로 스킬이 활성 상태로 수용되는지도 확인합니다. Codex가 설치되어 있어야 합니다.
 
-현재 구현 구조는 `examples/secretary/model.c4`에 있습니다. 이를 대상 프로젝트의
-`.secretary/architecture/model.c4`에 넣고 `/secretary-view`를 실행하면 구조를 탐색할 수 있습니다.
+이 검사는 모델 API 대화나 실제 사용자의 선택창 조작을 수행하지 않습니다. 결정 기록 검사는 주입한 입력을 사용합니다. 보고서와 View의 실제 사용성은 사용자 검증으로 확인합니다.
