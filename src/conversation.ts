@@ -94,7 +94,7 @@ export function formatStepSummary(entry: StepEntry, links: { report: string; vie
     stale.length ? `\n**재확인 필요:** ${rows(stale)}. 저장 후 변경되어 이전 검증 결과를 그대로 사용할 수 없습니다.` : "",
     `\n**다음:** ${line(next)}`,
     `**현재 상태:** ${STAGE_LABELS[entry.resultingStage]} · ${stale.length ? "산출물 변경 — 재검증 필요" : { active: "진행 가능", waiting: "응답 대기", blocked: "문제 해결 필요", finished: "완료" }[entry.resultingStatus]}`,
-    `[프로젝트 보고서](<${links.report}>) · [보고서·View](<${links.view}>)`,
+    `[프로젝트 보고서](<${links.report}>) · [보고서·구조도](<${links.view}>)`,
     `[단계 원문](<${links.steps}/${entry.revision}.json>)`,
   ].filter(Boolean).join("\n\n");
 }

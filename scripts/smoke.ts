@@ -40,6 +40,14 @@ try {
   writeFileSync(p.model, model);
   await cli(["view", cwd]);
   assert.equal(viewState(cwd), "fresh");
+  const localized = readFileSync(join(p.diagram, "index.html"), "utf8");
+  assert(localized.includes('lang="ko"') && localized.includes('id="assistant-view-korean"'));
+  assert(readFileSync(p.model, "utf8").includes("routing ortho"));
+  const receipt = JSON.parse(readFileSync(p.receipt, "utf8"));
+  writeFileSync(p.receipt, JSON.stringify({ ...receipt, presentationHash: "old-renderer" }));
+  assert.equal(viewState(cwd), "stale");
+  writeFileSync(p.receipt, JSON.stringify(receipt));
+  assert.equal(viewState(cwd), "fresh");
   writeFileSync(join(p.architecture, "extra.c4"), "model { extra = project '추가 초안' }");
   assert.equal(viewState(cwd), "stale");
   rmSync(join(p.architecture, "extra.c4"));
@@ -81,5 +89,5 @@ try {
   assert.equal(JSON.parse(await cli(["status", cwd])).workflow.freshness, "stale");
   assert((await cli(["summary", cwd])).includes("재검증 필요"));
   const host = await probeCodexSkill(cwd);
-  console.log(JSON.stringify({ cliCommands: "passed", installedSkillRunner: "passed", restartPreservesReport: true, decisionSerialization: "passed with injected input", stageLifecycle: "passed with injected question/answer", stageSummaryAndResume: "passed", artifactDrift: "stale after completed scenario", firstBuildFailure: "failed without broken link", architectureBuild: "passed", staleAndRecovery: "passed", ...host }, null, 2));
+  console.log(JSON.stringify({ cliCommands: "passed", installedSkillRunner: "passed", koreanViewGeneration: "passed", localizationFreshness: "stale when presentation changes", restartPreservesReport: true, decisionSerialization: "passed with injected input", stageLifecycle: "passed with injected question/answer", stageSummaryAndResume: "passed", artifactDrift: "stale after completed scenario", firstBuildFailure: "failed without broken link", architectureBuild: "passed", staleAndRecovery: "passed", ...host }, null, 2));
 } finally { rmSync(cwd, { recursive: true, force: true }); }

@@ -41,6 +41,17 @@ test("수동으로 바뀐 문서 구조는 덮어쓰지 않고 오류를 낸다"
   expect(readFileSync(p.report, "utf8")).toBe(changed);
 });
 
+test("기존 영문 View 절 제목을 한국어로 이행해도 결정 내용은 보존한다", () => {
+  const cwd = workspace();
+  const p = initialize(cwd, "기존 보고서 이행");
+  recordDecision(cwd, "표시 언어", ["한국어", "영어"], "한국어", "사용자 요청", "검사에서 주입한 응답");
+  const report = readFileSync(p.report, "utf8").replace("## 현재 설계·구조도", "## 현재 설계·View");
+  writeFileSync(p.report, report);
+  updateReport(cwd, "design", "하위 화면도 한국어로 표시한다.");
+  expect(readFileSync(p.report, "utf8")).toContain("## 현재 설계·구조도");
+  expect(readFileSync(p.report, "utf8")).toContain("선택: 한국어");
+});
+
 test("보고서가 만든 HTML에서는 원문 스크립트를 실행할 수 없다", () => {
   const cwd = workspace();
   const p = initialize(cwd, "화면 검증");

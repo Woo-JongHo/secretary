@@ -4,12 +4,13 @@ import { basename, join, resolve } from "node:path";
 import MarkdownIt from "markdown-it";
 import { formatStepSummary, STAGE_LABELS } from "./conversation.ts";
 import { activeEntries, changedArtifacts, readWorkflow } from "./stages.ts";
+import { collectModelText, localizeViewHtml, viewLocaleHash } from "./view-locale.ts";
 
 export const SECTIONS = {
   problem: "문제·성공 기준",
   options: "대안·추천 이유",
   decisions: "선택·기각 기록",
-  design: "현재 설계·View",
+  design: "현재 설계·구조도",
   verification: "확인 결과",
   next: "다음 쟁점",
 } as const;
@@ -47,8 +48,8 @@ export function initialize(cwd: string, problem: string) {
     writeFileSync(p.report, `# 프로젝트 보고서\n\n${sections.join("\n")}`, { flag: "wx" });
   }
   if (!existsSync(p.model)) {
-    const title = JSON.stringify(basename(resolve(cwd)));
-    writeFileSync(p.model, `specification {\n  element project\n}\nmodel {\n  project = project ${title} {\n    description '초기 초안입니다. 세부 구성 요소는 아직 정하지 않았습니다.'\n  }\n}\nviews {\n  view overview {\n    title '프로젝트 구조 — 초안'\n    include *\n  }\n}\n`, { flag: "wx" });
+    const description = JSON.stringify(`작업 폴더: ${basename(resolve(cwd))}. 초기 초안이며 세부 구성 요소는 아직 정하지 않았습니다.`);
+    writeFileSync(p.model, `specification {\n  element project\n}\nmodel {\n  project = project '프로젝트' {\n    description ${description}\n  }\n}\nviews {\n  view overview {\n    title '프로젝트 구조 — 초안'\n    routing ortho\n    include *\n  }\n}\n`, { flag: "wx" });
   }
   renderReport(cwd);
   return p;
@@ -57,9 +58,12 @@ export function initialize(cwd: string, problem: string) {
 function readSections(cwd: string): Record<Section, string> {
   const report = readFileSync(paths(cwd).report, "utf8");
   if (report.length > MAX_REPORT) throw new Error("보고서가 너무 깁니다. 현재 보고서와 상세 근거를 나눠 주세요.");
-  if (JSON.stringify(report.match(/^## .+$/gm)) !== JSON.stringify(Object.values(SECTIONS).map((label) => `## ${label}`))) throw new Error("보고서 절 구성이 바뀌었습니다. 원문을 보존한 채 공통 양식을 먼저 확인해 주세요.");
+  const headings = report.match(/^## .+$/gm);
+  const legacy = Object.values(SECTIONS).map((label) => `## ${label === SECTIONS.design ? "현재 설계·View" : label}`);
+  const labels = JSON.stringify(headings) === JSON.stringify(legacy) ? { ...SECTIONS, design: "현재 설계·View" } : SECTIONS;
+  if (JSON.stringify(headings) !== JSON.stringify(Object.values(labels).map((label) => `## ${label}`))) throw new Error("보고서 절 구성이 바뀌었습니다. 원문을 보존한 채 공통 양식을 먼저 확인해 주세요.");
   const result = {} as Record<Section, string>;
-  for (const [key, label] of Object.entries(SECTIONS)) {
+  for (const [key, label] of Object.entries(labels)) {
     const marker = `## ${label}\n`;
     const start = report.indexOf(marker);
     if (start < 0 || report.indexOf(marker, start + marker.length) >= 0) throw new Error(`보고서 절을 확인할 수 없습니다: ${label}`);
@@ -149,7 +153,7 @@ export function viewState(cwd: string): ViewState {
   if (!existsSync(p.receipt) || !existsSync(join(p.view, "architecture", "index.html"))) return existsSync(p.failure) ? "failed" : "missing";
   try {
     const receipt = JSON.parse(readFileSync(p.receipt, "utf8"));
-    return receipt.modelHash === architectureHash(cwd) && !existsSync(p.failure) ? "fresh" : "stale";
+    return receipt.modelHash === architectureHash(cwd) && receipt.presentationHash === viewLocaleHash() && !existsSync(p.failure) ? "fresh" : "stale";
   } catch {
     return "stale";
   }
@@ -169,13 +173,13 @@ export function renderReport(cwd: string) {
   const p = paths(cwd);
   mkdirSync(p.view, { recursive: true });
   const state = viewState(cwd);
-  const labels = { missing: "아키텍처 View: 아직 생성하지 않음", fresh: "아키텍처 View: 현재 모델과 일치", stale: "아키텍처 View: 오래됨 — 모델 확인 필요", failed: "아키텍처 View: 생성 실패 — 모델 확인 필요" };
+  const labels = { missing: "아키텍처 구조도: 아직 생성하지 않음", fresh: "아키텍처 구조도: 현재 모델과 일치", stale: "아키텍처 구조도: 오래됨 — 모델 확인 필요", failed: "아키텍처 구조도: 생성 실패 — 모델 확인 필요" };
   const link = state === "missing" || state === "failed" ? "" : '<a href="architecture/index.html">아키텍처 노드 보기</a>';
   const workflow = readWorkflow(p.root);
   const latest = workflow.history.at(-1);
   const summary = latest ? formatStepSummary(latest, { report: p.report, view: p.reportPage, steps: p.steps }, changedArtifacts(workflow)) : "";
   if (summary) writeFileSync(p.summary, summary);
-  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:"><title>Assistant — 프로젝트 보고서</title><style>:root{color-scheme:light dark}body{font:16px/1.75 system-ui,sans-serif;max-width:920px;margin:40px auto;padding:0 24px}nav{padding:16px 0;border-bottom:1px solid #8886}nav a{margin-left:20px}h2{margin-top:36px}a{color:light-dark(#245b9e,#9ac8ff)}pre{overflow:auto}table{border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #8886}</style></head><body><nav><strong>${escapeHtml(labels[state])}</strong>${link}</nav><main>${summary ? `<section aria-label="현재 단계 요약">${markdown.render(summary)}</section><hr>` : ""}${markdown.render(readFileSync(p.report, "utf8"))}</main></body></html>`;
+  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:"><title>과제 진행 비서 — 프로젝트 보고서</title><style>:root{color-scheme:light dark}body{font:16px/1.75 system-ui,sans-serif;max-width:920px;margin:40px auto;padding:0 24px}nav{padding:16px 0;border-bottom:1px solid #8886}nav a{margin-left:20px}h2{margin-top:36px}a{color:light-dark(#245b9e,#9ac8ff)}pre{overflow:auto}table{border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #8886}</style></head><body><nav><strong>${escapeHtml(labels[state])}</strong>${link}</nav><main>${summary ? `<section aria-label="현재 단계 요약">${markdown.render(summary)}</section><hr>` : ""}${markdown.render(readFileSync(p.report, "utf8"))}</main></body></html>`;
   writeFileSync(p.reportPage, html);
   return p.reportPage;
 }
@@ -184,6 +188,7 @@ export async function buildView(cwd: string, signal?: AbortSignal) {
   const p = paths(cwd);
   mkdirSync(p.view, { recursive: true });
   const snapshot = architectureHash(cwd);
+  const presentationHash = viewLocaleHash();
   const temporary = join(p.view, `architecture-${crypto.randomUUID()}`);
   const cli = join(PACKAGE_ROOT, "node_modules", ".bin", "likec4");
   const run = async (args: string[]) => {
@@ -200,13 +205,21 @@ export async function buildView(cwd: string, signal?: AbortSignal) {
   };
   try {
     await run(["validate", p.architecture, "--json"]);
-    await run(["build", p.architecture, "--output", temporary, "--output-single-file", "--use-hash-history"]);
-    if (architectureHash(cwd) !== snapshot) throw new Error("생성 도중 모델이 변경됐습니다. 다시 생성해 주세요.");
+    await run(["build", p.architecture, "--output", temporary, "--output-single-file", "--use-hash-history", "--title", "프로젝트 구조"]);
+    const exported = join(temporary, ".assistant-model.json");
+    await run(["export", "json", p.architecture, "--skip-layout", "--outfile", exported]);
+    const modelText = collectModelText(JSON.parse(readFileSync(exported, "utf8")));
+    rmSync(exported);
+    if (architectureHash(cwd) !== snapshot || viewLocaleHash() !== presentationHash) throw new Error("생성 도중 모델 또는 표시 설정이 변경됐습니다. 다시 생성해 주세요.");
     if (!existsSync(join(temporary, "index.html"))) throw new Error("생성된 아키텍처 페이지가 없습니다.");
+    for (const file of readdirSync(temporary).filter((name) => name.endsWith(".html"))) {
+      const path = join(temporary, file);
+      writeFileSync(path, localizeViewHtml(readFileSync(path, "utf8"), modelText));
+    }
     const destination = join(p.view, "architecture");
     rmSync(destination, { recursive: true, force: true });
     renameSync(temporary, destination);
-    writeFileSync(p.receipt, JSON.stringify({ modelHash: snapshot, builtAt: new Date().toISOString() }, null, 2));
+    writeFileSync(p.receipt, JSON.stringify({ modelHash: snapshot, presentationHash, builtAt: new Date().toISOString() }, null, 2));
     rmSync(join(p.view, "build-failed"), { force: true });
   } catch (error) {
     writeFileSync(join(p.view, "build-failed"), String(error));
