@@ -1,0 +1,36 @@
+{
+  "repository": "https://github.com/can1357/oh-my-pi",
+  "tag": "v18.16.0",
+  "commit": "650f3a108229ee11bf68ba3377f4e8c3391cd424",
+  "license": "MIT",
+  "scope": "계획 파일 읽기·재개와 계획 작성 지침만 선별 이식. OMP CLI·확장·인증·에이전트 루프는 포함하지 않는다.",
+  "files": [
+    {
+      "package": "@oh-my-pi/pi-coding-agent",
+      "version": "18.16.0",
+      "upstream_path": "packages/coding-agent/src/plan-mode/plan-handoff.ts",
+      "source_sha256": "2eec7460eb4d923153937a1a2c19646207d1b26f1c8581cd60a0908d428dd5b3",
+      "source_git_blob": "bfea95794749b96317c8d69e2f87ef2c3a18c60c",
+      "local_path": "src/plan.ts",
+      "mode": "adapted-subset"
+    },
+    {
+      "package": "@oh-my-pi/pi-coding-agent",
+      "version": "18.16.0",
+      "upstream_path": "packages/coding-agent/src/prompts/system/plan-mode-active.md",
+      "source_sha256": "cc2f68ffbee41cbce5454fb5f48172c20430e05a958b8756da01835ec8acffe2",
+      "source_git_blob": "88d1899670a1ae727bdfc8ef3010898aa20328ce",
+      "local_path": "skills/assistant/references/planning.md",
+      "mode": "adapted-subset"
+    },
+    {
+      "package": "@oh-my-pi/pi-coding-agent",
+      "version": "18.16.0",
+      "upstream_path": "packages/coding-agent/src/prompts/system/plan-mode-reference.md",
+      "source_sha256": "7f6f8bec7b4e33c2d58bca56b5a493a6fdf8f6db493850fbe88d2fab701b504c",
+      "source_git_blob": "7b493f497c870dabd93393f93e0a4d5619e679e5",
+      "local_path": "skills/assistant/references/planning.md",
+      "mode": "adapted-subset"
+    }
+  ]
+}

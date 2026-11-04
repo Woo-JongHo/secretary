@@ -1,68 +1,85 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { createAgentSession, SessionManager, Settings } from "@oh-my-pi/pi-coding-agent";
-import { buildView, initialized, paths, renderReport, viewState } from "../src/project.ts";
+import { buildView, paths, renderReport, viewState } from "../src/project.ts";
+import { probeCodexSkill } from "./codex-probe.ts";
+import type { StepInput } from "../src/conversation.ts";
 
-const cwd = mkdtempSync(join(tmpdir(), "secretary-smoke-"));
-const { session } = await createAgentSession({
-  cwd,
-  agentDir: join(cwd, "omp-agent"),
-  settings: Settings.isolated({}),
-  sessionManager: SessionManager.inMemory(cwd),
-  disableExtensionDiscovery: true,
-  additionalExtensionPaths: [resolve(import.meta.dir, "..")],
-  enableMCP: false,
-  enableLsp: false,
-});
+const cwd = realpathSync(mkdtempSync(join(tmpdir(), "assistant smoke ")));
+const cli = async (args: string[], input?: string) => {
+  const child = Bun.spawn([process.execPath, resolve(import.meta.dir, "../src/cli.ts"), ...args], { stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+  assert.equal(code, 0, stderr);
+  return stdout;
+};
 try {
-  const runner = session.extensionRunner;
-  assert(runner, "OMP 확장 실행기가 없습니다.");
-  const errors: string[] = [];
-  runner.onError((error) => errors.push(error.error));
-  assert(runner.getRegisteredCommands().some((command) => command.name === "secretary"));
-  const tools = runner.getAllRegisteredTools().map((tool) => tool.definition.name);
-  for (const name of ["secretary_report", "secretary_decide", "secretary_view"]) assert(tools.includes(name), `${name}을 OMP가 등록하지 않았습니다.`);
-  await session.prompt("/secretary");
-  assert.deepEqual(errors, [], `OMP 확장 오류: ${errors.join("; ")}`);
-  assert(initialized(cwd), "OMP가 /secretary 명령을 수용하지 않았습니다.");
-  const decision = runner.getRegisteredTool("secretary_decide")!.definition;
-  const context = runner.createContext();
-  const input = { topic: "수집 방식", options: ["기사 앱", "전용 단말"], rationale: "초기 검증 비용을 비교한다." };
-  const original = readFileSync(paths(cwd).report, "utf8");
-  await decision.execute("no-ui", input, undefined, undefined, context);
-  assert.equal(readFileSync(paths(cwd).report, "utf8"), original);
-  const uiContext = { ...context, hasUI: true, ui: { ...context.ui, select: async () => undefined } };
-  await decision.execute("cancel", input, undefined, undefined, uiContext);
-  assert.equal(readFileSync(paths(cwd).report, "utf8"), original);
-  await decision.execute("selected", input, undefined, undefined, { ...uiContext, ui: { ...uiContext.ui, select: async () => "기사 앱" } });
-  assert(readFileSync(paths(cwd).report, "utf8").includes("선택: 기사 앱"));
-  const injected = await runner.emitBeforeAgentStart("다음 쟁점을 정리해 주세요.", undefined, ["기존 시스템 지시"]);
-  assert(injected?.systemPrompt?.some((part) => part.includes("현재 프로젝트 보고서")), "OMP가 보고서 맥락을 수용하지 않았습니다.");
-  await session.prompt("/secretary-view");
-  assert.equal(viewState(cwd), "fresh");
+  await cli(["init", cwd]);
   const p = paths(cwd);
-  assert(readFileSync(p.reportPage, "utf8").includes("현재 모델과 일치"));
-  writeFileSync(join(p.architecture, "additional.c4"), "model { extra = project '추가 초안' }");
-  assert.equal(viewState(cwd), "stale");
-  rmSync(join(p.architecture, "additional.c4"));
-  rmSync(p.view, { recursive: true, force: true });
-  writeFileSync(p.model, "문법이 잘못된 모델");
+  const installedRunner = Bun.spawn([join(cwd, ".agents/skills/assistant/scripts/run"), "status", cwd], { stdout: "pipe", stderr: "pipe" });
+  const runnerStatus = JSON.parse(await new Response(installedRunner.stdout).text());
+  assert.equal(await installedRunner.exited, 0, await new Response(installedRunner.stderr).text());
+  assert.equal(runnerStatus.report, p.report);
+  await cli(["report", "problem", cwd, "--file", "-"], "시험 문제를 구현하고 제출 조건을 확인한다.");
+  await cli(["plan", cwd, "--file", "-"], "# 실행 계획\n\n1. 요구사항 확인\n2. 구현\n3. 검증");
+  const status = JSON.parse(await cli(["status", cwd]));
+  assert.equal(status.planReference, p.plan);
+  const original = readFileSync(p.report, "utf8");
+  const prompt = await cli(["start", cwd, "--task", "다음 개발", "--print-prompt"]);
+  assert(prompt.includes("$assistant") && prompt.includes(p.plan));
+  assert.equal(readFileSync(p.report, "utf8"), original);
+  // This checks record serialization only. It does not simulate a real user selection.
+  await cli(["decision", cwd, "--file", "-"], JSON.stringify({ topic: "검사 입력", options: ["A", "B"], selected: "A", rationale: "테스트용", evidence: "검사에서 주입한 응답이며 실제 사용자 결정 검증이 아님" }));
+  assert(readFileSync(p.report, "utf8").includes("선택: A"));
+  const model = readFileSync(p.model, "utf8");
+  writeFileSync(p.model, "최초 빌드 실패 입력");
   await assert.rejects(buildView(cwd));
-  assert.equal(viewState(cwd), "missing");
-  await session.prompt("/secretary-view");
-  assert(errors.length > 0, "실패 명령이 OMP 오류 경로로 전달되지 않았습니다.");
-  writeFileSync(p.model, "specification { element project } model { project = project '다시 생성' } views { view overview { include * } }");
-  await buildView(cwd);
+  assert.equal(viewState(cwd), "failed");
+  assert(readFileSync(p.reportPage, "utf8").includes("생성 실패"));
+  assert(!readFileSync(p.reportPage, "utf8").includes('href="architecture/index.html"'));
+  writeFileSync(p.model, model);
+  await cli(["view", cwd]);
   assert.equal(viewState(cwd), "fresh");
-  writeFileSync(p.model, "다시 잘못된 모델");
+  writeFileSync(join(p.architecture, "extra.c4"), "model { extra = project '추가 초안' }");
+  assert.equal(viewState(cwd), "stale");
+  rmSync(join(p.architecture, "extra.c4"));
+  writeFileSync(p.model, "잘못된 문법");
   await assert.rejects(buildView(cwd));
   assert.equal(viewState(cwd), "stale");
   renderReport(cwd);
   assert(readFileSync(p.reportPage, "utf8").includes("오래됨"));
-  console.log(JSON.stringify({ omp: "18.16.0", extensionAccepted: true, commandsAccepted: ["secretary", "secretary-view"], tools, reportContextAccepted: true, decisionBranches: ["no-ui unchanged", "cancel unchanged", "selected recorded"], architectureBuild: "passed", changedSource: "stale", failedBuild: "stale", deletedViewRecovery: "passed", modelApiCalled: false }, null, 2));
-} finally {
-  await session.dispose();
-  rmSync(cwd, { recursive: true, force: true });
-}
+  rmSync(p.view, { recursive: true, force: true });
+  writeFileSync(p.model, "specification { element project } model { project = project '복구' } views { view overview { include * } }");
+  await buildView(cwd);
+  assert.equal(viewState(cwd), "fresh");
+  let revision = 0;
+  const step = async (stage: StepInput["stage"], patch: Partial<StepInput>) => {
+    const input: StepInput = { id: `smoke-${revision + 1}`, expectedRevision: revision, stage, status: "progress", summary: "검사 입력: 단계 결과", facts: [], assumptions: [], unknowns: [], blockers: [], artifacts: [], checks: [], next: { kind: "act", text: "다음 검사 진행" }, ...patch };
+    const result = JSON.parse(await cli(["step", cwd, "--file", "-"], JSON.stringify(input)));
+    revision = result.revision;
+    assert.equal(result.savedRevision, revision);
+    return result;
+  };
+  const question = { id: "smoke-goal", type: "choice" as const, target: "goal" as const, text: "검사에서 주입할 목표", why: "실제 사용자 응답 검증이 아닌 단계 배선 검사", options: ["A", "B"], recommended: "A" };
+  await step("clarify", { status: "waiting", next: { kind: "ask", question } });
+  const resumed = JSON.parse(await cli(["status", cwd]));
+  assert.equal(resumed.workflow.status, "waiting");
+  assert.equal(resumed.workflow.question.options[0], "A");
+  await step("clarify", { status: "complete", answer: { questionId: question.id, value: "A", evidence: "검사에서 주입한 응답; 실제 사용자 결정 아님" }, intent: { request: "검사 목표", goal: "다섯 단계 배선 검증", userEvidence: "검사 입력", criteria: ["저장·재개·요약 연결"], components: ["단계", "보고서"], constraints: [] } });
+  writeFileSync(join(cwd, "design.md"), "검사용 구조 설계");
+  writeFileSync(join(cwd, "app.ts"), "export const smoke = true;\n");
+  await step("design", { status: "complete", artifacts: [{ label: "설계", path: "design.md" }] });
+  await step("implement", { status: "complete", artifacts: [{ label: "구현", path: "app.ts" }] });
+  await step("verify", { status: "complete", artifacts: [{ label: "검사 대상", path: "app.ts" }], checks: [{ name: "파일 확인", status: "passed", evidence: "smoke에서 생성한 파일을 다시 읽음: " + readFileSync(join(cwd, "app.ts"), "utf8").trim() }] });
+  await step("close", { status: "complete", artifacts: [{ label: "보고서", path: p.report }], next: { kind: "done", text: "주입 시나리오의 단계 배선 확인 완료" } });
+  assert.equal(JSON.parse(await cli(["status", cwd])).workflow.status, "finished");
+  assert((await cli(["summary", cwd])).includes("마무리 · 단계 완료"));
+  const projected = readFileSync(p.report, "utf8");
+  assert(projected.includes("검사 입력") && projected.includes("smoke-2"));
+  assert(readFileSync(p.reportPage, "utf8").includes("<table>"));
+  writeFileSync(join(cwd, "app.ts"), "export const changed = true;\n");
+  assert.equal(JSON.parse(await cli(["status", cwd])).workflow.freshness, "stale");
+  assert((await cli(["summary", cwd])).includes("재검증 필요"));
+  const host = await probeCodexSkill(cwd);
+  console.log(JSON.stringify({ cliCommands: "passed", installedSkillRunner: "passed", restartPreservesReport: true, decisionSerialization: "passed with injected input", stageLifecycle: "passed with injected question/answer", stageSummaryAndResume: "passed", artifactDrift: "stale after completed scenario", firstBuildFailure: "failed without broken link", architectureBuild: "passed", staleAndRecovery: "passed", ...host }, null, 2));
+} finally { rmSync(cwd, { recursive: true, force: true }); }

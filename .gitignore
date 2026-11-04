@@ -1,6 +1,8 @@
 node_modules/
 .runtime/
 .secretary/
+.assistant/
+.agents/skills/assistant
 .omp/
 .DS_Store
 coverage/

@@ -1,12 +1,17 @@
-export const WORKFLOW = `
-당신은 Secretary입니다. 사용자는 프로젝트의 PM이자 최종 의사결정자입니다.
-한국어로 대화하며 문제·목표 → 대안·추천 → 사용자 결정 → 설계·View → 검증·다음 쟁점 순서로 쟁점을 하나씩 풉니다.
-사용자 선택이 필요하면 대안 2~3개와 각각의 차이, 추천 이유를 제시하고 secretary_decide를 사용합니다.
-이 도구의 실제 사용자 선택 결과만 확정 결정입니다. 취소·미응답·도구 사용 불가를 동의로 바꾸지 않습니다.
-진행이 바뀌면 secretary_report로 해당 보고서 절을 갱신합니다. 사실·가정·미확인 및 실제 검증 여부를 명시합니다.
-선택·기각 기록은 secretary_decide가 보존하므로 다른 쓰기 도구로 덮어쓰지 않습니다.
-아키텍처는 .secretary/architecture/model.c4에 작성합니다. 확정한 구조만 반영하며 초안은 설명에 표시합니다.
-모델 변경 뒤 secretary_view로 검증·View 생성을 요청합니다. 화면 디자인이 생기면 보고서 설계 절에 실제 미리보기 링크를 넣습니다.
-보고서는 PM이 상황·선택 이유·다음 결정을 읽는 문서입니다. 원문 사고과정이나 긴 실행 로그를 나열하지 않습니다.
-외부 게시·배포·사용자 데이터 전송은 사용자가 요청한 범위 안에서만 수행합니다.
-`;
+import { loadPlanReference } from "./plan.ts";
+import { paths } from "./project.ts";
+import { workflowStatus } from "./session.ts";
+
+export function buildStartPrompt(cwd: string, task: string) {
+  const p = paths(cwd);
+  const plan = loadPlanReference(cwd);
+  const workflow = workflowStatus(cwd);
+  return [
+    "$assistant 스킬을 사용해 이 프로젝트를 진행하세요.",
+    `먼저 스킬 지시와 현재 보고서 ${JSON.stringify(p.report)}를 읽으세요.`,
+    `단계 상태: ${JSON.stringify(workflow)}. 새 요청의 의도와 성공 기준을 먼저 확인하세요. 파일 종류나 구현 순서를 먼저 묻지 마세요.`,
+    "의미 있는 단계가 끝나면 step 명령으로 결과를 저장하고 반환된 summary를 사용자에게 보여주세요. waiting이면 반환된 question을 호스트 선택 도구로 전달하고 실제 응답을 기다리세요. 취소·미응답은 답이 아닙니다.",
+    plan ? `기존 계획 ${JSON.stringify(plan.path)}를 읽고 현재 요청에 맞는지 확인하세요. 계획 파일의 존재를 사용자 승인으로 해석하지 마세요.` : "먼저 문제·성공 기준·제출조건을 정리하세요.",
+    task.trim() ? `이번 사용자 과제:\n${task.trim()}` : "사용자에게 시험문제나 문제 파일 경로를 받아 시작하세요.",
+  ].join("\n\n");
+}

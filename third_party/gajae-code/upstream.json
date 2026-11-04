@@ -1,0 +1,57 @@
+{
+  "repository": "https://github.com/Yeachan-Heo/gajae-code",
+  "tag": "v0.15.3",
+  "commit": "103659a2ebf6e698140c021981d47508389a2897",
+  "license": "MIT",
+  "adaptation": "Upstream question/progress, claims schema and phase-initialization contracts were selected and rewritten for Assistant. This is not a runtime integration or full workflow fork. Removed ambiguity percentages, GJC-specific tools, consensus agents and approval routing. Added project lifecycle validation, immutable revision receipts, artifact freshness and deterministic Korean summaries. Source originals archived locally under .runtime/upstream/gajae-code; exact public sources recoverable at commit.",
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "16eb3fc020a9dbefb165d2fb1d4597d2203c44bd",
+      "localTargets": [
+        "third_party/gajae-code/LICENSE"
+      ]
+    },
+    {
+      "path": "packages/coding-agent/src/defaults/gjc/skills/deep-interview/SKILL.md",
+      "gitBlob": "4c119706288bc168dd3175346376af15dfe6d8ef",
+      "localTargets": [
+        "skills/assistant/SKILL.md",
+        "skills/assistant/references/conversation.md",
+        "src/conversation.ts"
+      ]
+    },
+    {
+      "path": "packages/coding-agent/src/defaults/gjc/skills/ralplan/SKILL.md",
+      "gitBlob": "21d0cb074125d2e776f48ada3dbde9964d2967bc",
+      "localTargets": [
+        "skills/assistant/references/conversation.md",
+        "src/stages.ts"
+      ]
+    },
+    {
+      "path": "packages/coding-agent/src/skill-state/initial-phase.ts",
+      "gitBlob": "0bd6a75a0d1c2b2bdb1f008d5d893a72dd61ec48",
+      "localTargets": [
+        "src/conversation.ts",
+        "src/stages.ts"
+      ]
+    },
+    {
+      "path": "packages/coding-agent/src/workflow/workflow-intent-report.ts",
+      "gitBlob": "4b65df059f3a293049e2db230eaafa3f85b58b8a",
+      "localTargets": [
+        "src/conversation.ts",
+        "src/project.ts"
+      ]
+    },
+    {
+      "path": "packages/coding-agent/src/workflow/workflow-intent-report-schema.ts",
+      "gitBlob": "4d7091dd0b18a1e513feef490307126b274c1f1b",
+      "localTargets": [
+        "src/conversation.ts",
+        "src/project.ts"
+      ]
+    }
+  ]
+}

@@ -1,21 +1,25 @@
 {
-  "name": "@woo-jongho/secretary",
-  "version": "0.1.0",
+  "name": "@woo-jongho/assistant",
+  "version": "0.2.0",
   "private": true,
-  "description": "Oh My Pi 위에서 프로젝트 결정과 보고서, 아키텍처 View를 연결하는 얇은 하네스",
+  "description": "준비된 Codex에 과제 진행·결정·보고서·View를 더하는 harness",
   "type": "module",
-  "engines": { "bun": ">=1.4.4" },
-  "omp": { "extensions": ["./src/index.ts"] },
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "bin": {
+    "assistant": "./assistant"
+  },
   "scripts": {
-    "start": "bun src/cli.ts",
+    "start": "bun src/cli.ts start",
     "check": "tsc --noEmit",
     "test": "bun test",
     "smoke": "bun scripts/smoke.ts"
   },
   "dependencies": {
-    "@oh-my-pi/pi-coding-agent": "18.16.0",
     "likec4": "1.60.0",
-    "markdown-it": "14.1.0"
+    "markdown-it": "14.1.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
