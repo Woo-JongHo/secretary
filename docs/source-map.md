@@ -14,4 +14,6 @@
 
 새로 작성한 `src/session.ts`는 단계 저장·현재 상태·보고서 생성을 연결한다. `steps/N.json`이 원문이며 `report.md`, `summary.md`, HTML은 다시 생성할 수 있다. 저장된 파일 해시로 기록 뒤 변경을 찾고, 낡은 검증을 그대로 완료로 사용하지 않는다. 해시는 위조 방지 서명이나 실제 사용자 응답 인증이 아니다.
 
+`src/view-locale.ts`는 Assistant가 작성한 한국어 표시 모듈이다. LikeC4가 만든 프로그램·모델 데이터는 보존하며 메뉴·상세 탭·계층 안내·접근성 설명을 한국어로 표시한다. `src/project.ts`의 구조도 생성 경로가 이 모듈을 매번 적용하고, 표시 코드의 해시도 생성 영수증에 넣어 오래됨을 판정한다. 원본 LikeC4 소스를 이식하거나 의존성 폴더를 수정하는 방식은 아니다.
+
 이식 출처의 고정 commit과 원본 Git blob은 `third_party/*/upstream.json`에 있다. Gajae-Code의 실험 중이며 미연결인 harness-control-plane이나 모든 자동 리뷰·전용 실행 도구를 이식했다고 주장하지 않는다.
